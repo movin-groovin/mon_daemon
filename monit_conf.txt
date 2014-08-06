@@ -1,0 +1,9 @@
+
+#
+# From symbol '#' begins a comment string. Blank strings are allowed.
+# In this file there are pathes to binaries that our monitoring daemon
+# must controll. After path name through gap can be parameter of command
+# line, also through gap.
+# Example:	/home/yarr/src/srv/mon_daemon FIRST_PARAM ===DEADBEAF=== THIRD_PARAM
+#
+

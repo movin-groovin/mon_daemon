@@ -29,7 +29,7 @@ int daemonize (const char *chStr) {
 #endif
 		return 1;
 	} else if (prPid != 0) {
-		exit (0);
+		exit (1);
 	}
 #ifndef NDEBUG
 	closelog ();
@@ -53,7 +53,7 @@ int daemonize (const char *chStr) {
 		errVal = errno;
 		syslog (LOG_ERR, "Error of chdir: %s, errno num: %d\n", strerror (errVal), errVal);
 #endif
-		return 2;
+		return 3;
 	}
 	
 	for (int i = 0; i < limDat.rlim_max; ++i) {
