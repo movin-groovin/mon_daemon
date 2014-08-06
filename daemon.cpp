@@ -1,16 +1,23 @@
 
-#include "daemon.hpp"
+// gcc -lstdc++ -std=c++11 -lpthread daemonize.cpp daemon.cpp -o daemon
+
+#include "daemonize.hpp"
+
+#include <pthread.h>
 
 
 
-int daemonize (const char *rootDir) {
+int main (int argc, char *argv[]) {
 	
 	
 	
-	
-	
-	return XXXX;
+	return 0;
 }
+
+
+
+
+
 
 
 
