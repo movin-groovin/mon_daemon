@@ -6,8 +6,11 @@
 #include <fstream>
 #include <memory>
 #include <unordered_map>
+#include <sstream>
 
 #include <pthread.h>
+#include <dirent.h>
+#include <sys/wait.h>
 
 
 
@@ -130,6 +133,10 @@ public:
 	
 private:
 	void FinAllThreadsAndChilds (GLOBAL_CHILDS & chld);
+	
+	
+	//
+	friend void* threadSigHandler (void *pvPtr);
 };
 
 
