@@ -1,5 +1,7 @@
 
 // gcc -lstdc++ -std=c++11 -lpthread daemonize.cpp daemon.cpp -g -o daemon_cpp
+// 
+// gcc -lstdc++ -std=c++11 -lpthread daemonize.cpp daemon.cpp -DNDEBUG -o daemon_cpp
 
 #include "daemon.hpp"
 
@@ -303,13 +305,31 @@ void CTaskManager::StartWork () {
 
 
 void CTaskManager::FinAllWorkerThreads () {
+	std::vector <pid_t> thrChlds;
+	size_t shadPtr;
+	
+	
 	for (auto & val : m_dat.pthArr)
 		if (!pthread_kill (val, 0)) pthread_kill (val, SIGUSR1);
 		
 	usleep (secSleep * 1000 * 1000);
 	
-	for (auto &val : m_dat.pthArr)
-		if (!pthread_kill (val, 0)) pthread_kill (val, SIGKILL);
+	for (auto &val : m_dat.pthArr) {
+		if (!pthread_kill (val, 0))
+			pthread_kill (val, SIGKILL);
+		if (!pthread_join (val, reinterpret_cast <void**> (&shadPtr))) {
+			thrChlds.push_back (static_cast <pid_t> (shadPtr));
+		}
+	}
+	m_dat.pthArr.clear ();
+	
+	for (auto & pid : thrChlds) {
+#ifndef NDEBUG
+		syslog (LOG_WARNING, "Waiting for process with pid: %d\n", pid);
+#endif
+		waitpid (pid, NULL, 0);
+	}
+	
 	
 	return;
 }
@@ -362,6 +382,7 @@ void* threadSigHandler (void *pvPtr) {
 #ifndef NDEBUG
 			syslog (LOG_WARNING, "Have got unexcpected signal: %d\n", gotSig);
 #endif
+			;
 		}
 	}
 	
@@ -506,8 +527,8 @@ void *workerThread (void *pvPtr) {
 	pidNum = MakeChildThread (binPath);
 	while (true) {
 		if (!IsAlive (pidNum)) {
-			pidNum = MakeChildThread (binPath);
 			usleep ((CTaskManager::secSleep * 1000 * 1000) / 2);
+			pidNum = MakeChildThread (binPath);
 			continue;
 		}
 #ifndef NDEBUG
@@ -522,16 +543,13 @@ void *workerThread (void *pvPtr) {
 		#endif
 			// if we can't wait for signals we check zombie childs
 			waitpid (pidNum, NULL, WNOHANG);
-			usleep ((CTaskManager::secSleep * 1000 * 1000) / 2);
 			continue;
 		}
 		
 		switch (sigNum) {
 			case SIGUSR1:
 				kill (pidNum, SIGTERM);
-				usleep ((CTaskManager::secSleep * 1000 * 1000) / 2);
-				if (!kill (pidNum, 0)) kill (pidNum, SIGKILL);
-				pthread_exit (NULL);
+				pthread_exit (reinterpret_cast <void*> (pidNum));
 				break;
 			//
 			case SIGCHLD:
@@ -559,6 +577,7 @@ void *workerThread (void *pvPtr) {
 #ifndef NDEBUG
 			syslog (LOG_ERR, "Unexcpected signal, number: %d\n", sigNum);
 #endif
+			;
 		}
 	} 
 	
