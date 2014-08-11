@@ -15,6 +15,15 @@ void* threadFunc (void *p) {
 	return (void*)0x1234;
 }
 
+class CPrint {
+public:
+	int print (int *val) {
+		std::cout << "In file: " << __FILE__ << "; at line: " << __LINE__
+			      << "; of function: " <<__PRETTY_FUNCTION__ <<std::endl;
+		return 1;
+	}
+};
+
 
 int main (int argc, char **argv) {
 	sigset_t newMask, oldMask;
@@ -39,6 +48,8 @@ int main (int argc, char **argv) {
 		usleep (5 * 1000 * 1000);
 	}
 	*/
+	CPrint ().print (NULL);
+	
 	pthread_t thrId;
 	if (0 != pthread_create (&thrId, NULL, &threadFunc, NULL)) {
 		std::cout << "Erro of pthread_create\n";

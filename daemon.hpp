@@ -44,54 +44,6 @@ public:
 };
 
 
-class GLOBAL_CHILDS {
-private:
-	mutable pthread_mutex_t syncMut;
-	std::unordered_map <pthread_t, pid_t> mapChild;
-	
-public:
-	GLOBAL_CHILDS () {
-		if (0 != pthread_mutex_init (&syncMut, NULL)) throw CProgramException ();
-	}
-	~ GLOBAL_CHILDS () {
-		pthread_mutex_destroy (&syncMut);
-	}
-	
-	
-	void Insert (pthread_t thrId, pid_t childId) {
-		pthread_mutex_lock (&syncMut);
-		mapChild[thrId] = childId;
-		pthread_mutex_unlock (&syncMut);
-	}
-	
-	bool CheckPresence (pthread_t thrId) const {
-		pthread_mutex_lock (&syncMut);
-		bool ret = mapChild.end () == mapChild.find (thrId);
-		pthread_mutex_unlock (&syncMut);
-		return ret;
-	}
-	
-	void Remove (pthread_t thrId) {
-		pthread_mutex_lock (&syncMut);
-		mapChild.erase (thrId);
-		pthread_mutex_unlock (&syncMut);
-	}
-	
-	pid_t GetPid (pthread_t thrId) {
-		pthread_mutex_lock (&syncMut);
-		pid_t pid = mapChild[thrId];
-		pthread_mutex_unlock (&syncMut);
-		return pid == 0 ? -1 : pid;
-	}
-	
-	void Clear () {
-		pthread_mutex_lock (&syncMut);
-		mapChild.clear ();
-		pthread_mutex_unlock (&syncMut);
-	}
-};
-
-
 typedef struct _SET_OF_PARAMS {
 	pthread_t thrSigHnd;
 	
@@ -119,8 +71,9 @@ typedef struct _SET_OF_PARAMS {
 
 
 class CTaskManager {
-private:
+public:
 	static const int secSleep = 5;
+private:
 	SET_OF_PARAMS m_dat;
 	std::vector <std::string> m_pathArr;
 	std::string m_pathConf;
@@ -132,7 +85,7 @@ public:
 	void StartWork ();
 	
 private:
-	void FinAllThreadsAndChilds (GLOBAL_CHILDS & chld);
+	void FinAllWorkerThreads ();
 	
 	
 	//

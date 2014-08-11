@@ -1,10 +1,10 @@
 
-// gcc -lstdc++ -std=c++11 -lpthread daemonize.cpp daemon.cpp -o daemon
+// gcc -lstdc++ -std=c++11 -lpthread daemonize.cpp daemon.cpp -g -o daemon_cpp
 
 #include "daemon.hpp"
 
 
-GLOBAL_CHILDS g_chldData;
+
 char *goodString;// = "xxxDEAD-BEAFxxx";
 
 
@@ -82,21 +82,24 @@ void CTaskManager::StartWork () {
 	
 	sigfillset (&sigMask);
 	if (0 != (ret = pthread_sigmask (SIG_SETMASK, &sigMask, NULL))) {
+#ifndef NDEBUG
 		syslog (LOG_ERR, "Error of pthread_sigmask at CTaskManager::StartWork: %s; errno: %d\n",
 				StrError (ret).c_str (), ret);
+#endif
 		throw CTaskException ("Error of pthread_sigmask at CTaskManager::StartWork");
 	}
 	
-	if (0 != (ret = pthread_create (&m_dat.thrSigHnd, NULL, threadSigHandler, this))) {
-#ifndef NDEBUG
-		syslog (LOG_ERR, "Error of pthread_create: %s; errno: %d\n", StrError (ret).c_str (), ret);
-#endif
-		throw CTaskException ("Can't create a thread for signals handling");
-	}
-	pthread_detach (m_dat.thrSigHnd);
-	
 	
 	while (true) {
+		if (0 != (ret = pthread_create (&m_dat.thrSigHnd, NULL, threadSigHandler, this))) {
+#ifndef NDEBUG
+			syslog (LOG_ERR, "Error of pthread_create: %s; errno: %d\n", StrError (ret).c_str (), ret);
+#endif
+			throw CTaskException ("Can't create a thread for signals handling");
+		}
+		pthread_detach (m_dat.thrSigHnd);
+		
+		
 		std::ifstream ifsDat (m_pathConf);
 		if (!ifsDat) {
 #ifndef NDEBUG
@@ -147,10 +150,9 @@ void CTaskManager::StartWork () {
 		
 		if (m_dat.needFin)
 		{
-			FinAllThreadsAndChilds (g_chldData);
-			g_chldData.Clear ();
 			pthread_kill (m_dat.thrSigHnd, SIGTERM);
-			usleep (secSleep * 1000 * 1000);
+			FinAllWorkerThreads ();
+			//usleep (secSleep * 1000 * 1000);
 			if (!pthread_kill (m_dat.thrSigHnd, 0))
 				pthread_kill (m_dat.thrSigHnd, SIGKILL);
 			m_dat.needFin = false;
@@ -159,22 +161,19 @@ void CTaskManager::StartWork () {
 #endif
 			pthread_mutex_unlock (&m_dat.syncMut);
 			break;
-		} else if (m_dat.needReread)
+		} else // if (m_dat.needReread)
 		{
-			FinAllThreadsAndChilds (g_chldData);
-			g_chldData.Clear ();
+			pthread_kill (m_dat.thrSigHnd, SIGTERM);
+			FinAllWorkerThreads ();
+			//usleep (secSleep * 1000 * 1000);
+			if (!pthread_kill (m_dat.thrSigHnd, 0))
+				pthread_kill (m_dat.thrSigHnd, SIGKILL);
 			m_dat.needReread = false;
 #ifndef NDEBUG
 			syslog (LOG_WARNING, "Begining of reariding\n");
 #endif
-		} else
-		{
-#ifndef NDEBUG
-			syslog (LOG_WARNING, "Unexcpected event\n");
-#endif
+			pthread_mutex_unlock (&m_dat.syncMut);
 		}
-		
-		pthread_mutex_unlock (&m_dat.syncMut);
 	}
 	
 	
@@ -182,18 +181,14 @@ void CTaskManager::StartWork () {
 }
 
 
-void CTaskManager::FinAllThreadsAndChilds (GLOBAL_CHILDS & chld) {
+void CTaskManager::FinAllWorkerThreads () {
 	for (auto & val : m_dat.pthArr)
-		if (!pthread_kill (val, 0)) pthread_cancel (val);
+		if (!pthread_kill (val, 0)) pthread_kill (val, SIGUSR1);
 		
 	usleep (secSleep * 1000 * 1000);
 	
-	for (auto &val : m_dat.pthArr) {
-		if (!pthread_kill (val, 0)) {
-			pthread_kill (val, SIGKILL);
-			kill (chld.GetPid (val), SIGKILL);
-		}
-	}
+	for (auto &val : m_dat.pthArr)
+		if (!pthread_kill (val, 0)) pthread_kill (val, SIGKILL);
 	
 	return;
 }
@@ -202,43 +197,44 @@ void CTaskManager::FinAllThreadsAndChilds (GLOBAL_CHILDS & chld) {
 void* threadSigHandler (void *pvPtr) {
 	CTaskManager *ctPtr = static_cast <CTaskManager *> (pvPtr);
 	sigset_t sigSet;
-	int ret, gotSig, chldStatus;
-	pid_t pidNum;
+	int ret, gotSig;
 	
 	
 	sigemptyset (&sigSet);
 	sigaddset (&sigSet, SIGHUP);
 	sigaddset (&sigSet, SIGTERM);
-	sigaddset (&sigSet, SIGCHLD);
 	while (true) {
 		if (0 != (ret = sigwait (&sigSet, &gotSig))) {
 #ifndef NDEBUG
 		syslog (LOG_WARNING, "Error of sigwait in thread sig-handler: %s; errno: %d\n",
 				StrError (ret).c_str (), ret);
 #endif
-			exit (101);
+			//exit (101);
+			usleep ((CTaskManager::secSleep * 1000  *1000) / 2);
+			continue;
 		}
 		
 		switch (gotSig) {
 			case SIGHUP:
+#ifndef NDEBUG
+				syslog (LOG_WARNING, "Have got SIGHUP\n");
+#endif
 				pthread_mutex_lock (&ctPtr->m_dat.syncMut);
 				ctPtr->m_dat.needReread = true;
 				pthread_mutex_unlock (&ctPtr->m_dat.syncMut);
 				pthread_cond_signal (&ctPtr->m_dat.syncCond);
+				pthread_exit (NULL);
 				break;
 			//
 			case SIGTERM:
+#ifndef NDEBUG
+				syslog (LOG_WARNING, "Have got SIGTERM\n");
+#endif
 				pthread_mutex_lock (&ctPtr->m_dat.syncMut);
 				ctPtr->m_dat.needFin = true;
 				pthread_mutex_unlock (&ctPtr->m_dat.syncMut);
 				pthread_cond_signal (&ctPtr->m_dat.syncCond);
-				break;
-			//
-			case SIGCHLD:
-				pidNum = waitpid (-1, &chldStatus, 0);
-#ifndef NDEBUG
-			syslog (LOG_WARNING, "Child process with pid: %d is dead\n", pidNum);
-#endif
+				pthread_exit (NULL);
 				break;
 			//
 			default:
@@ -253,12 +249,17 @@ void* threadSigHandler (void *pvPtr) {
 }
 
 
-bool IsAlive (const std::string & prPid) {
+bool IsAlive (pid_t pidNum) {
 	DIR *dPtr;
 	int ret, tmp = 0, fd;
 	const int cmdLine = 2048 + 1;
 	std::unique_ptr <char []> arrMem (new char [cmdLine]);
+	std::string prPid;
+	std::ostringstream ossCnv;
 	
+	
+	ossCnv << pidNum;
+	prPid = ossCnv.str ();
 
 	if (NULL == (dPtr = opendir (("/proc/" + prPid).c_str ()))) {
 #ifndef NDEBUG
@@ -308,8 +309,9 @@ bool IsAlive (const std::string & prPid) {
 }
 
 
-std::string MakeChildThread (const std::string & binPath) {
+pid_t MakeChildThread (const std::string & binPath) {
 	std::string pidStr;
+	sigset_t sigMsk;
 	pid_t pidVal;
 	int ret;
 	char *argvArr [] = {NULL, goodString, NULL};
@@ -322,11 +324,24 @@ std::string MakeChildThread (const std::string & binPath) {
 	if ((pidVal = fork ()) == -1) {
 #ifndef NDEBUG
 		ret = errno;
-		syslog (LOG_WARNING, "Error of fork: %s; errno: %d\n",
+		syslog (LOG_ERR, "Error of fork: %s; errno: %d\n",
 				StrError (ret).c_str (), ret);
 #endif
-		return std::string ();
+		return -1;
 	} else if (pidVal == 0) {
+		//
+		// This thread cretaed by main thread with full filled mask (all signals are blocked)
+		// So in forked process we will unblock all signals, restoring signal's mask
+		//
+		sigemptyset (&sigMsk);
+		if (0 != (ret = pthread_sigmask (SIG_SETMASK, &sigMsk, NULL))) {
+#ifndef NDEBUG
+			syslog (LOG_ERR, "Error of pthread_sigmask : %s; errno: %d in: %s at line: of function: %s\n",
+					StrError (ret).c_str (), ret, __FILE__, __LINE__, __func__);
+#endif
+			return -1;
+		}
+		
 		if (std::string::npos == (posInd = binPath.find_last_of ('/')))
 		{
 			argvArr [0] = const_cast <char*> (&binPath[0]);
@@ -335,59 +350,88 @@ std::string MakeChildThread (const std::string & binPath) {
 			posInd++;
 			argvArr [0] = const_cast <char*> (&binPath[posInd]);
 		}
+		// if there are slashes - the path is absolute, otherwise is relative
 		if ((ret = execv (std::string::npos == posInd ? argvArr[0] : binPath.c_str (),
 						  argvArr)) == -1
 		   )
 		{
 #ifndef NDEBUG
 			ret = errno;
-			syslog (LOG_WARNING, "Error of execv: %s; errno: %d\n",
+			syslog (LOG_ERR, "Error of execv: %s; errno: %d\n",
 					StrError (ret).c_str (), ret);
 #endif
 			pthread_exit ((void*)0x1);
-			return std::string ();
+			return -1;
 		}
 	}
-	std::ostringstream ossCnv;
-	ossCnv << pidVal;
 	
 	
-	return ossCnv.str ();
+	return pidVal;
 }
 
 
 void *workerThread (void *pvPtr) {
 	std::string binPath = *static_cast <const std::string*> (pvPtr);
-	const int secSlp = 2;
-	int oldSt, newSt = PTHREAD_CANCEL_ENABLE;
 	std::string prPid;
-	std::istringstream issCnv;
+	sigset_t sigMask;
 	pid_t pidNum;
+	int ret, sigNum, sigRetWait;
 	
 	
-	pthread_setcancelstate (newSt, &oldSt);
+	sigemptyset (&sigMask);
+	sigaddset (&sigMask, SIGCHLD);
+	sigaddset (&sigMask, SIGUSR1);
 	
-	prPid = MakeChildThread (binPath);
-	issCnv.str (prPid);
-	issCnv >> pidNum;
-	g_chldData.Insert (pthread_self (), pidNum);
+	pidNum = MakeChildThread (binPath);
 	while (true) {
-#ifndef NDEBUG
-		syslog (LOG_WARNING, "Pid: %s - pid: %d\n", prPid.c_str (), pidNum);
-#endif
-		if (!IsAlive (prPid)) {
-			prPid = MakeChildThread (binPath);
-			issCnv.str (prPid);
-			issCnv >> pidNum;
-			g_chldData.Insert (pthread_self (), pidNum);
+		if (!IsAlive (pidNum)) {
+			pidNum = MakeChildThread (binPath);
+			usleep ((CTaskManager::secSleep * 1000 * 1000) / 2);
+			continue;
 		}
 #ifndef NDEBUG
 		else 
-			syslog (LOG_WARNING, "PProcess alive; id: %s - pid: %d\n", prPid.c_str (), pidNum);
+			syslog (LOG_WARNING, "Process alive, pid: %d\n", pidNum);
 #endif
 		
-		sleep (secSlp);
-		pthread_testcancel ();
+		if (0 != (ret = sigwait (&sigMask, &sigNum))) {
+		#ifndef NDEBUG
+			syslog (LOG_ERR, "Error of sigwait: %s; errno: %d\n",
+					StrError (ret).c_str (), ret);
+		#endif
+			// if we can't wait for signals we check zombie childs
+			waitpid (pidNum, NULL, WNOHANG);
+			usleep ((CTaskManager::secSleep * 1000 * 1000) / 2);
+			continue;
+		}
+		
+		switch (sigNum) {
+			case SIGUSR1:
+				kill (pidNum, SIGTERM);
+				usleep ((CTaskManager::secSleep * 1000 * 1000) / 2);
+				if (!kill (pidNum, 0)) kill (pidNum, SIGKILL);
+				pthread_exit (NULL);
+				break;
+			//
+			case SIGCHLD:
+				while (true) {
+					if ((sigRetWait = waitpid (-1, NULL, WNOHANG)) == -1 && errno == EINTR) continue;
+					else break;
+				}
+#ifndef NDEBUG
+				if (sigRetWait != -1) syslog (LOG_WARNING, "Child process with pid has finished: %d\n", sigRetWait);
+				else {
+					ret = errno;
+					syslog (LOG_ERR, "Error of waitpid: %s; errno: %d\n", StrError (ret).c_str (), ret);
+				}
+#endif
+				break;
+			//
+			default:
+#ifndef NDEBUG
+			syslog (LOG_ERR, "Unexcpected signal, number: %d\n", sigNum);
+#endif
+		}
 	} 
 	
 	

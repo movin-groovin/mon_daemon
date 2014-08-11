@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cerrno>
 #include <cstring>
+#include <sstream>
+#include <string>
 
 #include <unistd.h>
 #include <signal.h>
@@ -58,6 +60,17 @@ int main () {
 	printUContext (&cntDat);
 	printf ("\n");
 	sleep (5);
+	
+	
+	std::string ss = "12345";
+	std::istringstream iss;
+	iss.str (ss);
+	ss [0] = '9';
+	ss [1] = '9';
+	int val;
+	iss >> val;
+	
+	std::cout << "Result: " << val << std::endl;
 	
 	
 	return 0;
