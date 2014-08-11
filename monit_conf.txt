@@ -7,4 +7,5 @@
 # Example:	/home/yarr/src/srv/mon_daemon FIRST_PARAM ===DEADBEAF=== THIRD_PARAM
 #
 #/bin/cat
-/home/rainbow/src/mon_daemon/sleeper
+#/home/rainbow/src/mon_daemon/sleeper
+/home/yarr/src/srv/mon_daemon/sleeper
