@@ -9,3 +9,6 @@
 #/bin/cat
 #/home/rainbow/src/mon_daemon/sleeper
 /home/yarr/src/srv/mon_daemon/sleeper
+/home/yarr/src/srv/mon_daemon/sleeper1
+/home/yarr/src/srv/mon_daemon/sleeper2
+/home/yarr/src/srv/mon_daemon/sleeper3

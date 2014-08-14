@@ -27,12 +27,5 @@ int daemonize (const char *chStr);
 
 
 
-
-
-
-
-
-
-
 #endif // DAEMON_HEADER
 

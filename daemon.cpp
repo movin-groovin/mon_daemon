@@ -276,8 +276,8 @@ void CTaskManager::StartWork () {
 			pthread_kill (m_dat.thrSigHnd, SIGTERM);
 			FinAllWorkerThreads ();
 			//usleep (secSleep * 1000 * 1000);
-			if (!pthread_kill (m_dat.thrSigHnd, 0))
-				pthread_kill (m_dat.thrSigHnd, SIGKILL);
+			//if (!pthread_kill (m_dat.thrSigHnd, 0))
+			//	pthread_kill (m_dat.thrSigHnd, SIGKILL);
 			m_dat.needFin = false;
 #ifndef NDEBUG
 			syslog (LOG_WARNING, "Finit ala comedia\n");
@@ -289,8 +289,8 @@ void CTaskManager::StartWork () {
 			pthread_kill (m_dat.thrSigHnd, SIGTERM);
 			FinAllWorkerThreads ();
 			//usleep (secSleep * 1000 * 1000);
-			if (!pthread_kill (m_dat.thrSigHnd, 0))
-				pthread_kill (m_dat.thrSigHnd, SIGKILL);
+			//if (!pthread_kill (m_dat.thrSigHnd, 0))
+			//	pthread_kill (m_dat.thrSigHnd, SIGKILL);
 			m_dat.needReread = false;
 #ifndef NDEBUG
 			syslog (LOG_WARNING, "Begining of reariding\n");
