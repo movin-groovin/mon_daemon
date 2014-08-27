@@ -1,7 +1,6 @@
 
 #include "daemonize.hpp"
 
-#include <vector>
 #include <exception>
 #include <fstream>
 #include <memory>

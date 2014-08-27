@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include <cerrno>
 #include <cstring>
@@ -24,6 +25,7 @@
 
 
 int daemonize (const char *chStr);
+int IsAlreadyRunning (const std::string & cmdLinePar, const std::string & pidFile);
 
 
 
