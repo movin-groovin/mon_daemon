@@ -8,6 +8,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <sstream>
 
 #include <cerrno>
 #include <cstring>
@@ -24,8 +26,10 @@
 
 
 
+std::string StrError (int errCode);
 int daemonize (const char *chStr);
 int IsAlreadyRunning (const std::string & cmdLinePar, const std::string & pidFile);
+int makeTmpPidFile (const std::string & fileName);
 
 
 
