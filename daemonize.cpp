@@ -36,7 +36,8 @@ int daemonize (const char *chStr) {
 	openlog (chStr, LOG_PID, 0);
 #endif
 	
-	setsid ();
+	setsid (); // new session setup
+	
 	saDat.sa_handler = SIG_IGN;
 	saDat.sa_flags = 0;
 	sigemptyset (&saDat.sa_mask);
