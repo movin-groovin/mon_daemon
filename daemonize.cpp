@@ -3,6 +3,13 @@
 
 
 
+std::string StrError (int errCode) {
+	std::vector <char> tmp (1024 + 1);
+	
+	return std::string (strerror_r (errCode, &tmp[0], 1024));
+}
+
+
 int daemonize (const char *chStr) {
 #ifndef NDEBUG
 	int errVal;
@@ -70,9 +77,29 @@ int daemonize (const char *chStr) {
 }
 
 
+// 0 - file not exists, 1 - file exists, -1 - an error
+int makeTmpPidFile (const std::string & fileName) {
+	std::fstream fFs (fileName.c_str (), std::ios::in);
+	
+	if (!fFs) {
+		std::fstream oFs (fileName.c_str (), std::ios::out);
+		std::ostringstream ossCnv;
+		pid_t procPid = getpid ();
+		
+		if (!oFs) return -1;
+		ossCnv << procPid;
+		oFs << ossCnv.str ();
+		
+		return 0;
+	}
+	
+	return 1;
+}
+
+
 int IsAlreadyRunning (
-	const std::string & cmdLinePar,
-	const std::string & pidFile
+	const std::string & cmdLinePar, // unique cmdline parameter
+	const std::string & pidFile     // a file to process pid
 )
 //Ret values: 0 - not running; 1 - is running; -1 - an error have happened
 {
@@ -117,7 +144,7 @@ int IsAlreadyRunning (
 		syslog (LOG_ERR, "Error of open file: %s; description: %s; errno: %d\n",
 				strTmp.c_str (), StrError (ret).c_str (), ret);
 #endif
-		return ENOENT == errno ? 0 : -1;
+		return /*ENOENT == errno ? 0 :*/ -1;
 	}
 	bufLen *= 10;
 	chBuf.resize (bufLen + 1);
